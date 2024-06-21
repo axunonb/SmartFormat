@@ -120,14 +120,6 @@ public class Placeholder : FormatItem
     internal List<Selector> Selectors => _selectors;
 
     /// <summary>
-    /// Gets an <see cref="IReadOnlyList{T}"/> of all <see cref="Selector"/>s within the <see cref="Placeholder"/>.
-    /// </summary>
-    public IReadOnlyList<Selector> GetSelectors()
-    {
-        return _selectors.AsReadOnly();
-    }
-
-    /// <summary>
     /// Add a new <see cref="Selector"/> to the list <see cref="Selectors"/>.
     /// If the <see cref="Selector"/> has an alignment operator, the <see cref="Alignment"/> will be set.
     /// </summary>
@@ -193,7 +185,7 @@ public class Placeholder : FormatItem
             var pool = ArrayPool<char>.Create(Length > 1024 ? Length : 1024, 1024);
             var resultBuffer = pool.Rent(Length);
             System.Diagnostics.Debug.Assert(resultBuffer.Length >= Length, "ArrayPool buffer size is smaller than it should be");
-
+            
             try
             {
                 _formatterOptionsCache = EscapedLiteral
@@ -218,6 +210,48 @@ public class Placeholder : FormatItem
     /// Gets or sets the <see cref="Format"/> of the <see cref="Placeholder"/>.
     /// </summary>
     public Format? Format { get; set; }
+
+    /// <summary>
+    /// Returns <see langword="true"/>, if the <see cref="Placeholder"/> is a plain placeholder without any formatting.
+    /// This means, that the <see cref="FormatterName"/> is empty, the <see cref="FormatterOptions"/> is empty, and the <see cref="Format"/> is not nested.
+    /// Alignment is allowed.
+    /// <example>Example: "{DateTime.Now.Month}" or "{Invoice.Total,-10}"</example>
+    /// </summary>
+    public bool IsPlainPlaceholder =>
+        FormatterName.Length == 0 && FormatterOptions.Length == 0 && Format is not { HasNested: true };
+
+    /// <summary>
+    /// Gets an <see cref="IReadOnlyList{T}"/> of all <see cref="Selector"/>s within the <see cref="Placeholder"/>.
+    /// </summary>
+    public IReadOnlyList<Selector> GetSelectors()
+    {
+        return _selectors.AsReadOnly();
+    }
+
+    /// <summary>
+    /// Gets the <see cref="Selector"/>s of the <see cref="Placeholder"/> joined with the selector operator.
+    /// </summary>
+    /// <example>Example: For the placeholder "{Person?.Siblings[0],10}", the result is "Person.Siblings.0"</example>
+    /// <returns>The <see cref="Selector"/>s of the <see cref="Placeholder"/> joined with the selector operator.</returns>
+    public ReadOnlySpan<char> GetSelectorsAsSpanDotNotation()
+    {
+        using var zb = ZString.ZStringBuilderUtilities.CreateZStringBuilder();
+        var first = true;
+#pragma warning disable S3267 // Don't use LINQ in favor of less GC
+        foreach (var selector in Selectors)
+        {
+            if (selector.Length == 0 || selector.Operator == ",") continue;
+
+            if (!first)
+            {
+                zb.Append(SmartSettings.Parser.SelectorOperator);
+            }
+            zb.Append(selector.AsSpan());
+            first = false;
+        }
+#pragma warning restore S3267 // Restore: Loops should be simplified with "LINQ" expressions
+        return zb.AsSpan();
+    }
 
     /// <summary>
     /// Gets the string representation of the <see cref="Placeholder"/> with all parsed components.

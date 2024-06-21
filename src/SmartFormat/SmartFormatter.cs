@@ -525,7 +525,7 @@ public class SmartFormatter
     /// </remarks>
     /// <param name="formattingInfo"></param>
     /// <exception cref="FormattingException"></exception>
-    private void EvaluateSelectors(FormattingInfo formattingInfo)
+    internal void EvaluateSelectors(FormattingInfo formattingInfo)
     {
         if (formattingInfo.Placeholder is null) return;
 
