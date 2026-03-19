@@ -27,31 +27,44 @@ public class DictionarySource : Source
     {
         var current = selectorInfo.CurrentValue;
         if (TrySetResultForNullableOperator(selectorInfo)) return true;
-            
-        if (current is null) return false;
+
+        if (current == null) return false;
+        var dictionaryType = GetDictionaryType(current);
+        if (dictionaryType == DictionaryType.None) return false;
 
         var selector = selectorInfo.SelectorText;
         var comparison = selectorInfo.FormatDetails.Settings.GetCaseSensitivityComparison();
 
         // Try to get the selector value for IDictionary
-        if (TryGetIDictionaryValue(current, selector, comparison, out var value))
+        if (dictionaryType == DictionaryType.NonGeneric
+            && TryGetIDictionaryValue(current, selector, comparison, out var value))
         {
             selectorInfo.Result = value;
             return true;
         }
 
         // Try to get the selector value for Dictionary<,> and dynamics (ExpandoObject)
-        if (TryGetGenericDictionaryValue(current, selector, comparison, out value))
+        if (dictionaryType == DictionaryType.Generic
+            && TryGetGenericDictionaryValue(current, selector, comparison, out value))
         {
             selectorInfo.Result = value;
             return true;
         }
 
         // Try to get the selector value for IReadOnlyDictionary<,>
-        if (IsIReadOnlyDictionarySupported && TryGetReadOnlyDictionaryValue(current, selector,
-                comparison, out value))
+        if (dictionaryType == DictionaryType.ReadOnly && IsIReadOnlyDictionarySupported
+            && TryGetReadOnlyDictionaryValue(current, selector, comparison, out value))
         {
             selectorInfo.Result = value;
+            return true;
+        }
+
+        // No matching key found in a dictionary, but if the selector
+        // has a nullable operator, we set the result to null
+        // instead of leaving it as not found.
+        if (HasNullableOperator(selectorInfo))
+        {
+            selectorInfo.Result = null;
             return true;
         }
         
@@ -144,13 +157,6 @@ public class DictionarySource : Source
         if (RoDictionaryTypeCache.TryGetValue(type, out propertyTuple))
             return propertyTuple != null;
 
-        if (!IsIReadOnlyDictionary(type))
-        {
-            // don't check the type again, although it's not a IReadOnlyDictionary
-            RoDictionaryTypeCache[type] = null;
-            return false;
-        }
-
         // get Key and Item properties of the dictionary
         propertyTuple = (type.GetProperty(nameof(IDictionary.Keys)), type.GetProperty("Item"))!;
 
@@ -175,4 +181,20 @@ public class DictionarySource : Source
     }
 
     #endregion
+
+    internal enum DictionaryType
+    {
+        None,
+        NonGeneric,
+        Generic,
+        ReadOnly
+    }
+
+    private DictionaryType GetDictionaryType(object current)
+    {
+        if (current is IDictionary) return DictionaryType.NonGeneric;
+        if (current is IDictionary<string, object?>) return DictionaryType.Generic;
+        if (IsIReadOnlyDictionarySupported && IsIReadOnlyDictionary(current.GetType())) return DictionaryType.ReadOnly;
+        return DictionaryType.None;
+    }
 }

@@ -33,23 +33,31 @@ public abstract class Source : ISource, IInitializer
     }
 
     /// <summary>
-    /// Checks if any of the <see cref="Placeholder"/>'s <see cref="Placeholder.Selectors"/> has nullable <c>?</c> as their first operator.
+    /// Checks whether any of the <see cref="Placeholder"/>'s <see cref="Placeholder.Selectors"/>,
+    /// up to and including the selector at <see cref="ISelectorInfo.SelectorIndex"/>,
+    /// has the nullable <c>?</c> as the first character of its operator.
     /// </summary>
-    /// <param name="selectorInfo"></param>
+    /// <param name="selectorInfo">The <see cref="ISelectorInfo"/> for the selector currently being evaluated.</param>
     /// <returns>
-    /// <see langword="true"/>, any of the <see cref="Placeholder"/>'s <see cref="Placeholder.Selectors"/> has nullable <c>?</c> as their first operator.
+    /// <see langword="true"/> if any <see cref="Placeholder.Selectors"/> with a
+    /// <see cref="Parsing.Selector.SelectorIndex"/> less than or equal to <see cref="ISelectorInfo.SelectorIndex"/>
+    /// has the nullable <c>?</c> as the first character of its operator; otherwise <see langword="false"/>.
     /// </returns>
     /// <remarks>
-    /// The nullable operator '?' can be followed by a dot (like '?.') or a square brace (like '.[')
+    /// Only selectors up to the current one are considered, so a nullable operator on a later selector
+    /// in the same <see cref="Placeholder"/> does not influence the evaluation of earlier selectors.
+    /// The nullable operator <c>?</c> must be followed by a dot (e.g. <c>?.</c>) or a square bracket (e.g. <c>?[</c>).
     /// </remarks>
-    private bool HasNullableOperator(ISelectorInfo selectorInfo)
+    protected virtual bool HasNullableOperator(ISelectorInfo selectorInfo)
     {
         if (_smartSettings != null && selectorInfo.Placeholder != null)
         {
 #pragma warning disable S3267 // Don't use LINQ in favor of less GC
             foreach (var s in selectorInfo.Placeholder.Selectors)
             {
-                if (s.OperatorLength > 1 && s.BaseString[s.OperatorStartIndex] == ParserSettings.NullableOperator)
+                if (s.SelectorIndex <= selectorInfo.SelectorIndex
+                    && s.OperatorLength > 1
+                    && s.BaseString[s.OperatorStartIndex] == ParserSettings.NullableOperator)
                     return true;
             }
 #pragma warning restore S3267 // Restore: Loops should be simplified with "LINQ" expressions
