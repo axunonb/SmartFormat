@@ -4,6 +4,7 @@
 
 using System;
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Reflection;
 using SmartFormat.Core.Extensions;
@@ -166,18 +167,28 @@ public class DictionarySource : Source
         return true;
     }
 
+    private static readonly ConcurrentDictionary<Type, bool> RoDictionaryTypeBoolCache = new();
+
     private static bool IsIReadOnlyDictionary(Type type)
     {
+        if (RoDictionaryTypeBoolCache.TryGetValue(type, out var cached))
+            return cached;
+
         // No Linq for less garbage
+        var result = false;
         foreach (var typeInterface in type.GetInterfaces())
         {
             if (typeInterface == typeof(IReadOnlyDictionary<,>) ||
                 (typeInterface.IsGenericType
                  && typeInterface.GetGenericTypeDefinition() == typeof(IReadOnlyDictionary<,>)))
-                return true;
+            {
+                result = true;
+                break;
+            }
         }
 
-        return false;
+        RoDictionaryTypeBoolCache[type] = result;
+        return result;
     }
 
     #endregion

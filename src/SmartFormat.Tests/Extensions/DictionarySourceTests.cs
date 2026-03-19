@@ -2,8 +2,6 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Dynamic;
-using System.Globalization;
-using System.Linq;
 using NUnit.Framework;
 using SmartFormat.Core.Formatting;
 using SmartFormat.Core.Settings;
@@ -164,7 +162,7 @@ public class DictionarySourceTests
     [Test]
     public void Dictionary_NullableOperator_MissingKey_ReturnsEmpty()
     {
-        // Test for GitHub issue #522
+        // Test similar to GitHub issue #522, but using string keys
         var sf = Smart.CreateDefaultSmartFormat();
 
         var obj = new {
@@ -193,7 +191,39 @@ public class DictionarySourceTests
 
         // Now add the missing key and verify that it is properly resolved
         obj.Changes.Add("Volume", 200);
-        Assert.That(sf.Format("{Changes:{Count};{?.Volume};{Name}}", obj),
+        Assert.That(sf.Format("{Changes.Count};{Changes?.Volume};{Changes.Name}", obj),
+            Is.EqualTo("100;200;ABCD"));
+    }
+
+    private enum ChangeKey { Count, Volume, Name }
+
+    [Test]
+    public void Dictionary_NullableOperator_MissingEnumKey_ReturnsEmpty()
+    {
+        // Test for GitHub issue #522 with non-string dictionary keys
+        var sf = Smart.CreateDefaultSmartFormat();
+        var obj = new {
+            Changes = new Dictionary<ChangeKey, object>
+            {
+                { ChangeKey.Count, 100 },
+                // Volume is intentionally missing
+                // although it is accessed in the format string
+                { ChangeKey.Name, "ABCD" },
+            }
+        };
+        // Use nullable syntax to avoid exceptions for selectors
+        // that cannot be resolved with the DictionarySource:
+        // 'Volume' may be missing, but 'Changes' is expected to be present
+        var result =
+            sf.Format("{Changes.Count};{Changes?.Volume};{Changes.Name}", obj);
+        Assert.Multiple(() =>
+        {
+            Assert.That(result, Is.EqualTo("100;;ABCD"));
+        });
+
+        // Now add the missing key and verify that it is properly resolved
+        obj.Changes.Add(ChangeKey.Volume, 200);
+        Assert.That(sf.Format("{Changes.Count};{Changes?.Volume};{Changes.Name}", obj),
             Is.EqualTo("100;200;ABCD"));
     }
 
