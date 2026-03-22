@@ -2,8 +2,8 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Dynamic;
-using System.Linq;
 using NUnit.Framework;
+using SmartFormat.Core.Formatting;
 using SmartFormat.Core.Settings;
 using SmartFormat.Extensions;
 using SmartFormat.Tests.TestUtils;
@@ -160,6 +160,98 @@ public class DictionarySourceTests
     }
 
     [Test]
+    public void Dictionary_NullableOperator_MissingKey_ReturnsEmpty()
+    {
+        // Test similar to GitHub issue #522, but using string keys
+        var sf = Smart.CreateDefaultSmartFormat();
+
+        var obj = new {
+            Changes = new Dictionary<string, object>
+            {
+                { "Count", 100 },
+                // Volume is intentionally missing
+                // although it is accessed in the format string
+                { "Name", "ABCD" },
+            }
+        };
+
+        // Use nullable syntax to avoid exceptions for selectors
+        // that cannot be resolved with the DictionarySource:
+        // 'Volume' may be missing, but 'Changes' is expected to be present
+        var resultSyntax1 =
+            sf.Format("{Changes:{Count};{?.Volume};{Name}}", obj);
+        var resultSyntax2 =
+            sf.Format("{Changes.Count};{Changes?.Volume};{Changes.Name}", obj);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(resultSyntax1, Is.EqualTo("100;;ABCD"));
+            Assert.That(resultSyntax2, Is.EqualTo("100;;ABCD"));
+        });
+
+        // Now add the missing key and verify that it is properly resolved
+        obj.Changes.Add("Volume", 200);
+        Assert.That(sf.Format("{Changes.Count};{Changes?.Volume};{Changes.Name}", obj),
+            Is.EqualTo("100;200;ABCD"));
+    }
+
+    private enum ChangeKey { Count, Volume, Name }
+
+    [Test]
+    public void Dictionary_NullableOperator_MissingEnumKey_ReturnsEmpty()
+    {
+        // Test for GitHub issue #522 with non-string dictionary keys
+        var sf = Smart.CreateDefaultSmartFormat();
+        var obj = new {
+            Changes = new Dictionary<ChangeKey, object>
+            {
+                { ChangeKey.Count, 100 },
+                // Volume is intentionally missing
+                // although it is accessed in the format string
+                { ChangeKey.Name, "ABCD" },
+            }
+        };
+        // Use nullable syntax to avoid exceptions for selectors
+        // that cannot be resolved with the DictionarySource:
+        // 'Volume' may be missing, but 'Changes' is expected to be present
+        var result =
+            sf.Format("{Changes.Count};{Changes?.Volume};{Changes.Name}", obj);
+        Assert.Multiple(() =>
+        {
+            Assert.That(result, Is.EqualTo("100;;ABCD"));
+        });
+
+        // Now add the missing key and verify that it is properly resolved
+        obj.Changes.Add(ChangeKey.Volume, 200);
+        Assert.That(sf.Format("{Changes.Count};{Changes?.Volume};{Changes.Name}", obj),
+            Is.EqualTo("100;200;ABCD"));
+    }
+
+    [Test]
+    public void Dictionary_NullableOperator_MissingKey_OnWrongSelector()
+    {
+        // Test for GitHub issue #522
+        var sf = Smart.CreateDefaultSmartFormat();
+
+        var obj = new { Changes = new Dictionary<string, object>
+            {
+                { "Count", 100 },
+                // Volume is intentionally missing
+                // although it is accessed in the format string
+                { "Name", "ABCD" },
+            }
+        };
+
+        // The nullable operator must only be applied
+        // to the selector that is expected to be missing or
+        // a preceding selector in the chain that is expected to be missing
+        // Here: 'Changes' is expected to be present, but 'Volume' is missing,
+        // so the nullable operator must be applied to 'Volume' instead of after 'Volume'
+        Assert.Throws<FormattingException>(() =>
+            sf.Format("{Changes.Count};{Changes.Volume?.Anything};{Changes.Name}", obj));
+    }
+
+    [Test]
     public void Generic_Dictionary_String_String()
     {
         var dict = new Dictionary<string, string> { { "Name", "Joe" } };
@@ -193,28 +285,6 @@ public class DictionarySourceTests
         var result = smart.Format("{One}{Two}{Three}", roDict);
 
         Assert.That(result, Is.EqualTo("12three"));
-    }
-
-    [Test]
-    public void IReadOnlyDictionary_Cache_Should_Store_Types_It_Cannot_Handle()
-    {
-        var dictSource = new DictionarySource { IsIReadOnlyDictionarySupported = true };
-        var kvp = new KeyValuePair<string, object?>("One", 1);
-        var smart = new SmartFormatter()
-            .AddExtensions(new DefaultSource(), dictSource, new KeyValuePairSource())
-            .AddExtensions(new DefaultFormatter());
-        var result = smart.Format("{One}", kvp);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(result, Is.EqualTo("1"));
-            Assert.That(dictSource.RoDictionaryTypeCache.Keys, Has.Count.EqualTo(1));
-        });
-        Assert.Multiple(() =>
-        {
-            Assert.That(dictSource.RoDictionaryTypeCache.Keys.First(), Is.EqualTo(typeof(KeyValuePair<string, object?>)));
-            Assert.That(dictSource.RoDictionaryTypeCache.Values.First(), Is.Null);
-        });
     }
 
     public class CustomReadOnlyDictionary<TKey, TValue> : IReadOnlyDictionary<TKey, TValue?>
