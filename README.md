@@ -1,4 +1,4 @@
-<img src="https://raw.githubusercontent.com/scottrippey/SmartFormat.NET/main/SmartFormat_64x64.png" width="64" alt="Logo">
+<img src="https://raw.githubusercontent.com/axuno/SmartFormat.NET/main/SmartFormat.svg" width="100" alt="Logo">
 
 [![GitHub release](https://img.shields.io/github/release/axuno/smartformat.net.svg?sort=semver)](https://github.com/axuno/SmartFormat.Net/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-brightgreen.svg)](https://github.com/axuno/SmartFormat.Net/blob/main/License.txt)

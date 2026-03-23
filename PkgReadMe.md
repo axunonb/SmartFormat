@@ -1,4 +1,4 @@
-# ![SmartFormat](https://raw.githubusercontent.com/scottrippey/SmartFormat.NET/main/SmartFormat_64x64.png)
+<img src="https://raw.githubusercontent.com/axuno/SmartFormat.NET/main/SmartFormat.svg" width="100" alt="SmartFormat">
 
 ### What is *SmartFormat*?
 
